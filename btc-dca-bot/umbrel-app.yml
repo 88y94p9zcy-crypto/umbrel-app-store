@@ -5,26 +5,21 @@ name: BTC DCA Bot
 version: "1.0.0"
 tagline: Automatické pravidelné nákupy BTC na Binance
 description: >-
-  DCA bot pro Binance. Nakupuj BTC pravidelně a automaticky.
-  Podporuje dip buying ve čtyřech úrovních a Telegram notifikace.
-  Sledování zůstatku s upozorněním při nízkém stavu účtu.
+  DCA bot pro Binance s dip buyingem ve 4 úrovních,
+  Telegram notifikacemi a sledováním zůstatku.
 developer: 88y94p9zcy-crypto
 website: https://github.com/88y94p9zcy-crypto/umbrel-app-store
-dependencies: []
 repo: https://github.com/88y94p9zcy-crypto/umbrel-app-store
 support: https://github.com/88y94p9zcy-crypto/umbrel-app-store/issues
 port: 3000
-gallery:
-  - https://raw.githubusercontent.com/88y94p9zcy-crypto/umbrel-app-store/main/btc-dca-bot/gallery/1.png
+gallery: []
 path: ""
 defaultUsername: ""
 defaultPassword: ""
 torOnly: false
-permissions:
-  - STORAGE_DOWNLOADS
 containers:
-  - name: main
-    image: ghcr.io/88y94p9zcy-crypto/btc-dca-bot:latest
+  - name: btc-dca-bot
+    image: btc-dca-bot
     port: 3000
     volumes:
       - name: data
