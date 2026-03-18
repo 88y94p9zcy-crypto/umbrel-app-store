@@ -18,8 +18,8 @@ defaultUsername: ""
 defaultPassword: ""
 torOnly: false
 containers:
-  - name: btc-dca-bot
-    image: btc-dca-bot
+  - name: main
+    image: 88y94p9zcy/btc-dca-bot:latest
     port: 3000
     volumes:
       - name: data
