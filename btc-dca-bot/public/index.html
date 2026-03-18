@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BTC DCA Bot</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117; --surface: #181c27; --surface2: #1e2334;
+    --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+    --text: #e8eaf0; --muted: #7a8099;
+    --green: #1db97a; --green-dim: rgba(29,185,122,0.12);
+    --amber: #f59e0b; --amber-dim: rgba(245,158,11,0.12);
+    --red: #ef4444; --red-dim: rgba(239,68,68,0.1);
+    --blue: #3b82f6; --radius: 10px; --radius-sm: 6px;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter','SF Pro Display',system-ui,sans-serif; font-size: 14px; line-height: 1.5; }
+  .layout { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+  nav { background: var(--surface); border-right: 1px solid var(--border); padding: 1.5rem 1rem; display: flex; flex-direction: column; gap: 4px; }
+  .nav-logo { display: flex; align-items: center; gap: 8px; padding: 0.5rem; margin-bottom: 1.5rem; }
+  .nav-logo .icon { width: 32px; height: 32px; background: var(--amber); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .nav-logo span { font-size: 15px; font-weight: 600; }
+  .nav-item { padding: 8px 12px; border-radius: var(--radius-sm); cursor: pointer; color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 8px; transition: all 0.15s; }
+  .nav-item:hover, .nav-item.active { background: var(--surface2); color: var(--text); }
+  .nav-item .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+  .nav-item.active .dot { background: var(--green); }
+  main { padding: 2rem; overflow-y: auto; }
+  .page { display: none; }
+  .page.active { display: block; }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 1.5rem; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; }
+  .card-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 1rem; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 1rem; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 12px; color: var(--muted); }
+  .field input, .field select { background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius-sm); color: var(--text); padding: 8px 10px; font-size: 13px; width: 100%; outline: none; transition: border-color 0.15s; }
+  .field input:focus, .field select:focus { border-color: var(--blue); }
+  .field select option { background: var(--surface2); }
+  .toggle-row { display: flex; align-items: center; gap: 12px; margin-bottom: 1rem; }
+  .toggle { width: 40px; height: 22px; border-radius: 11px; background: var(--border2); position: relative; cursor: pointer; border: none; transition: background 0.2s; flex-shrink: 0; }
+  .toggle.on { background: var(--green); }
+  .toggle::after { content:''; position:absolute; width:16px; height:16px; background:white; border-radius:50%; top:3px; left:3px; transition:left 0.2s; }
+  .toggle.on::after { left: 21px; }
+  .toggle-info strong { font-size: 14px; }
+  .toggle-info span { display: block; font-size: 12px; color: var(--muted); }
+  .metric { background: var(--surface2); border-radius: var(--radius-sm); padding: 1rem; }
+  .metric-label { font-size: 11px; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .metric-val { font-size: 22px; font-weight: 600; }
+  .metric-val.green { color: var(--green); }
+  .metric-val.amber { color: var(--amber); }
+  .metric-change { font-size: 11px; margin-top: 4px; color: var(--muted); }
+  .metric-change.up { color: var(--green); }
+  .metric-change.down { color: var(--red); }
+  button.btn { border: none; border-radius: var(--radius-sm); padding: 9px 18px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  button.btn-primary { background: var(--green); color: #000; }
+  button.btn-primary:hover { background: #16a066; }
+  button.btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border2); }
+  button.btn-ghost:hover { background: var(--surface2); }
+  .btn-row { display: flex; gap: 8px; margin-top: 1.25rem; align-items: center; }
+  .badge { display: inline-block; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 100px; }
+  .badge-dca { background: var(--green-dim); color: var(--green); }
+  .badge-dip1 { background: var(--amber-dim); color: var(--amber); }
+  .badge-dip2 { background: rgba(239,68,68,0.15); color: #f87171; }
+  .badge-dip3 { background: rgba(239,68,68,0.25); color: #fca5a5; }
+  .badge-manual { background: rgba(59,130,246,0.15); color: #60a5fa; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 10px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  tr:last-child td { border-bottom: none; }
+  .status-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--green-dim); border: 1px solid rgba(29,185,122,0.2); border-radius: var(--radius-sm); font-size: 12px; color: var(--green); margin-bottom: 1.5rem; }
+  .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+  .note { font-size: 12px; color: var(--muted); background: var(--surface2); border-radius: var(--radius-sm); padding: 10px 12px; line-height: 1.6; margin-top: 10px; border-left: 2px solid var(--border2); }
+  #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); padding: 12px 18px; font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999; }
+  #toast.show { opacity: 1; }
+  .dip-card { border-left: 3px solid; }
+  .dip-card.dip1 { border-left-color: var(--amber); }
+  .dip-card.dip2 { border-left-color: #f87171; }
+  .dip-card.dip3 { border-left-color: #fca5a5; }
+  .tg-cmd { background: var(--surface2); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 12px; font-family: monospace; color: var(--green); margin: 4px 0; display: block; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav>
+    <div class="nav-logo">
+      <div class="icon">₿</div>
+      <span>DCA Bot</span>
+    </div>
+    <div class="nav-item active" onclick="showPage('dashboard', this)"><div class="dot"></div> Dashboard</div>
+    <div class="nav-item" onclick="showPage('settings', this)"><div class="dot"></div> Nastavení</div>
+    <div class="nav-item" onclick="showPage('trades', this)"><div class="dot"></div> Nákupy</div>
+    <div class="nav-item" onclick="showPage('api', this)"><div class="dot"></div> API & Telegram</div>
+  </nav>
+
+  <main>
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <h1>Dashboard</h1>
+      <p class="subtitle">Přehled tvého BTC DCA bota</p>
+      <div id="status-bar" class="status-bar" style="display:none;">
+        <div class="pulse"></div>
+        <span id="status-text">Bot běží</span>
+      </div>
+      <div class="grid4">
+        <div class="metric"><div class="metric-label">BTC cena</div><div class="metric-val" id="btcPrice">–</div><div class="metric-change" id="btcChange">načítám...</div></div>
+        <div class="metric"><div class="metric-label">Nakoupeno celkem</div><div class="metric-val green" id="totalBtc">–</div></div>
+        <div class="metric"><div class="metric-label">Investováno (USDT)</div><div class="metric-val amber" id="totalUsdt">–</div></div>
+        <div class="metric"><div class="metric-label">Průměrná cena</div><div class="metric-val" id="avgPrice">–</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Aktivní strategie</div>
+        <div id="strategy-summary" style="color:var(--muted);font-size:13px;">Načítám...</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Poslední nákupy</div>
+        <table>
+          <thead><tr><th>Datum</th><th>Typ</th><th>USDT</th><th>BTC</th><th>Cena</th></tr></thead>
+          <tbody id="recentTrades"><tr><td colspan="5" style="color:var(--muted);text-align:center;padding:2rem">Zatím žádné nákupy</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="page" id="page-settings">
+      <h1>Nastavení strategie</h1>
+      <p class="subtitle">Konfigurace DCA a dip buying</p>
+
+      <!-- DCA -->
+      <div class="card">
+        <div class="toggle-row">
+          <button class="toggle on" id="t-dca" onclick="toggleSwitch('dca')"></button>
+          <div class="toggle-info"><strong>Pravidelný DCA nákup BTC</strong><span>Automaticky nakupuj BTC v pravidelných intervalech</span></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Částka za nákup (USDT)</label><input type="number" id="dcaAmount" value="50" min="10" /></div>
+          <div class="field"><label>Interval</label>
+            <select id="dcaInterval">
+              <option value="daily">Každý den</option>
+              <option value="weekly" selected>Každý týden</option>
+              <option value="biweekly">Každé 2 týdny</option>
+              <option value="monthly">Každý měsíc</option>
+            </select>
+          </div>
+          <div class="field"><label>Den nákupu</label>
+            <select id="dcaDay">
+              <option>Pondělí</option><option>Úterý</option><option>Středa</option>
+              <option selected>Čtvrtek</option><option>Pátek</option><option>Sobota</option><option>Neděle</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- DIP 1 -->
+      <div class="card dip-card dip1">
+        <div class="toggle-row">
+          <button class="toggle" id="t-dip1" onclick="toggleSwitch('dip1')"></button>
+          <div class="toggle-info"><strong>⚡ Dip buying — úroveň 1 (malý pokles)</strong><span>Extra nákup při mírném poklesu</span></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Pokles o (%) za 24h</label>
+            <select id="dip1Percent">
+              <option>3</option><option>5</option><option selected>7</option><option>10</option><option>12</option><option>15</option>
+            </select>
+          </div>
+          <div class="field"><label>Extra částka (USDT)</label><input type="number" id="dip1Amount" value="50" min="10" /></div>
+          <div class="field"><label>Max nákupů / měsíc</label>
+            <select id="dip1Max">
+              <option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- DIP 2 -->
+      <div class="card dip-card dip2">
+        <div class="toggle-row">
+          <button class="toggle" id="t-dip2" onclick="toggleSwitch('dip2')"></button>
+          <div class="toggle-info"><strong>🔥 Dip buying — úroveň 2 (střední pokles)</strong><span>Větší nákup při silnějším poklesu</span></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Pokles o (%) za 24h</label>
+            <select id="dip2Percent">
+              <option>10</option><option>12</option><option selected>15</option><option>18</option><option>20</option><option>25</option>
+            </select>
+          </div>
+          <div class="field"><label>Extra částka (USDT)</label><input type="number" id="dip2Amount" value="100" min="10" /></div>
+        </div>
+      </div>
+
+      <!-- DIP 3 -->
+      <div class="card dip-card dip3">
+        <div class="toggle-row">
+          <button class="toggle" id="t-dip3" onclick="toggleSwitch('dip3')"></button>
+          <div class="toggle-info"><strong>🔥🔥 Dip buying — úroveň 3 (velký pokles)</strong><span>Maximální nákup při výrazném propadu</span></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Pokles o (%) za 24h</label>
+            <select id="dip3Percent">
+              <option>20</option><option>25</option><option selected>30</option><option>35</option><option>40</option><option>50</option>
+            </select>
+          </div>
+          <div class="field"><label>Extra částka (USDT)</label><input type="number" id="dip3Amount" value="200" min="10" /></div>
+        </div>
+      </div>
+
+      <!-- DIP 4 -->
+      <div class="card dip-card dip3">
+        <div class="toggle-row">
+          <button class="toggle" id="t-dip4" onclick="toggleSwitch('dip4')"></button>
+          <div class="toggle-info"><strong>🔥🔥🔥 Dip buying — úroveň 4 (extrémní pokles)</strong><span>Maximální nákup při výrazném propadu</span></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Pokles o (%) za 24h</label>
+            <select id="dip4Percent">
+              <option>25</option><option>30</option><option>35</option><option selected>40</option><option>50</option><option>60</option>
+            </select>
+          </div>
+          <div class="field"><label>Extra částka (USDT)</label><input type="number" id="dip4Amount" value="300" min="10" /></div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="saveConfig()">Uložit konfiguraci</button>
+      </div>
+    </div>
+
+    <!-- TRADES -->
+    <div class="page" id="page-trades">
+      <h1>Historie nákupů</h1>
+      <p class="subtitle">Všechny provedené nákupy</p>
+      <div class="card">
+        <table>
+          <thead><tr><th>Datum</th><th>Typ</th><th>USDT</th><th>BTC</th><th>Cena</th></tr></thead>
+          <tbody id="allTrades"><tr><td colspan="5" style="color:var(--muted);text-align:center;padding:2rem">Zatím žádné nákupy</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- API -->
+    <div class="page" id="page-api">
+      <h1>API & Telegram</h1>
+      <p class="subtitle">Připojení k Binance a notifikace</p>
+      <div class="card">
+        <div class="card-title">Binance API</div>
+        <div class="grid2">
+          <div class="field"><label>API Key</label><input type="password" id="apiKey" placeholder="Vlož Binance API key..." /></div>
+          <div class="field"><label>API Secret</label><input type="password" id="apiSecret" placeholder="Vlož Binance API secret..." /></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="testConnection()">Otestovat připojení</button>
+          <span id="connStatus" style="font-size:12px;color:var(--muted)"></span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Telegram notifikace</div>
+        <div class="grid2">
+          <div class="field"><label>Bot Token</label><input type="text" id="tgToken" placeholder="123456:ABC-xyz..." /></div>
+          <div class="field"><label>Chat ID</label><input type="text" id="tgChatId" placeholder="1764704869" /></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="saveApiConfig()">Uložit</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Telegram příkazy</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Piš botovi přímo v Telegramu:</p>
+        <code class="tg-cmd">/stav — aktuální cena BTC a přehled portfolia</code>
+        <code class="tg-cmd">/koupit 50 — ručně nakoupit BTC za 50 USDT</code>
+        <code class="tg-cmd">/historie — posledních 5 nákupů</code>
+        <code class="tg-cmd">/help — seznam všech příkazů</code>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const toggleState = { dca: true, dip1: false, dip2: false, dip3: false, dip4: false };
+
+function showPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  if (el) el.classList.add('active');
+  if (name === 'trades') loadAllTrades();
+  if (name === 'dashboard') loadDashboard();
+}
+
+function toggleSwitch(key) {
+  toggleState[key] = !toggleState[key];
+  document.getElementById('t-' + key).className = 'toggle' + (toggleState[key] ? ' on' : '');
+}
+
+function toast(msg, type = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = (type === 'ok' ? '✓ ' : '✗ ') + msg;
+  el.style.color = type === 'ok' ? 'var(--green)' : 'var(--red)';
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+async function testConnection() {
+  const key = document.getElementById('apiKey').value;
+  const secret = document.getElementById('apiSecret').value;
+  const status = document.getElementById('connStatus');
+  status.textContent = 'Testování...';
+  try {
+    const r = await fetch('/api/test-connection', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ apiKey: key, apiSecret: secret }) });
+    const d = await r.json();
+    if (d.ok) { status.style.color = 'var(--green)'; status.textContent = `✓ Připojeno — BTC: $${d.price.toLocaleString('en-US',{maximumFractionDigits:0})}`; }
+    else { status.style.color = 'var(--red)'; status.textContent = '✗ ' + d.error; }
+  } catch(e) { status.style.color = 'var(--red)'; status.textContent = '✗ ' + e.message; }
+}
+
+async function saveConfig() {
+  const existing = await fetch('/api/config').then(r => r.json()).catch(() => ({}));
+  const cfg = {
+    ...(existing || {}),
+    symbol: existing?.symbol || 'BTCUSDC',
+    dca: {
+      enabled: toggleState.dca,
+      dcaAmount: parseFloat(document.getElementById('dcaAmount').value),
+      dcaInterval: document.getElementById('dcaInterval').value,
+      dcaDay: document.getElementById('dcaDay').value,
+    },
+    dip: {
+      dip1: { enabled: toggleState.dip1, percent: parseFloat(document.getElementById('dip1Percent').value), amount: parseFloat(document.getElementById('dip1Amount').value), maxPerMonth: parseInt(document.getElementById('dip1Max').value) },
+      dip2: { enabled: toggleState.dip2, percent: parseFloat(document.getElementById('dip2Percent').value), amount: parseFloat(document.getElementById('dip2Amount').value) },
+      dip3: { enabled: toggleState.dip3, percent: parseFloat(document.getElementById('dip3Percent').value), amount: parseFloat(document.getElementById('dip3Amount').value) },
+      dip4: { enabled: toggleState.dip4, percent: parseFloat(document.getElementById('dip4Percent').value), amount: parseFloat(document.getElementById('dip4Amount').value) },
+    }
+  };
+  await fetch('/api/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(cfg) });
+  toast('Konfigurace uložena');
+}
+
+async function saveApiConfig() {
+  const existing = await fetch('/api/config').then(r => r.json()).catch(() => ({}));
+  const cfg = { ...(existing || {}), binance: { apiKey: document.getElementById('apiKey').value, apiSecret: document.getElementById('apiSecret').value }, telegram: { token: document.getElementById('tgToken').value, chatId: document.getElementById('tgChatId').value } };
+  await fetch('/api/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(cfg) });
+  toast('API konfigurace uložena');
+}
+
+function tradeTypeBadge(type) {
+  if (type === 'DCA') return '<span class="badge badge-dca">DCA</span>';
+  if (type === 'MANUÁLNÍ') return '<span class="badge badge-manual">Manuální</span>';
+  if (type.includes('DIP1')) return `<span class="badge badge-dip1">${type}</span>`;
+  if (type.includes('DIP2')) return `<span class="badge badge-dip2">${type}</span>`;
+  if (type.includes('DIP3')) return `<span class="badge badge-dip3">${type}</span>`;
+  return `<span class="badge badge-dip1">${type}</span>`;
+}
+
+function formatDate(iso) {
+  return new Date(iso).toLocaleString('cs-CZ', { day:'numeric', month:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+async function loadDashboard() {
+  try {
+    const p = await fetch('/api/price').then(r => r.json());
+    document.getElementById('btcPrice').textContent = '$' + p.price.toLocaleString('en-US',{maximumFractionDigits:0});
+    const chEl = document.getElementById('btcChange');
+    chEl.textContent = (p.change24h > 0 ? '+' : '') + p.change24h.toFixed(2) + '% (24h)';
+    chEl.className = 'metric-change ' + (p.change24h >= 0 ? 'up' : 'down');
+    document.getElementById('status-bar').style.display = 'flex';
+    document.getElementById('status-text').textContent = `Bot běží · BTC ${p.change24h > 0 ? '▲' : '▼'} ${Math.abs(p.change24h).toFixed(2)}% za 24h`;
+  } catch(e) {}
+
+  try {
+    const s = await fetch('/api/stats').then(r => r.json());
+    document.getElementById('totalBtc').textContent = s.totalBtc.toFixed(8) + ' BTC';
+    document.getElementById('totalUsdt').textContent = '$' + s.totalUsdt.toFixed(2);
+    document.getElementById('avgPrice').textContent = s.avgPrice > 0 ? '$' + s.avgPrice.toLocaleString('en-US',{maximumFractionDigits:0}) : '–';
+  } catch(e) {}
+
+  try {
+    const trades = await fetch('/api/trades').then(r => r.json());
+    const tbody = document.getElementById('recentTrades');
+    if (trades.length) tbody.innerHTML = trades.slice(0,5).map(t => `<tr><td>${formatDate(t.date)}</td><td>${tradeTypeBadge(t.type)}</td><td>${t.usdt}</td><td>${t.btc.toFixed(8)}</td><td>$${t.price.toLocaleString('en-US',{maximumFractionDigits:0})}</td></tr>`).join('');
+  } catch(e) {}
+
+  try {
+    const cfg = await fetch('/api/config').then(r => r.json());
+    if (cfg) {
+      const lines = [];
+      if (cfg.dca?.enabled) lines.push(`✅ DCA: ${cfg.dca.dcaAmount} USDT / ${cfg.dca.dcaInterval}`);
+      if (cfg.dip?.dip1?.enabled) lines.push(`⚡ Dip L1: při -${cfg.dip.dip1.percent}% → ${cfg.dip.dip1.amount} USDT`);
+      if (cfg.dip?.dip2?.enabled) lines.push(`🔥 Dip L2: při -${cfg.dip.dip2.percent}% → ${cfg.dip.dip2.amount} USDT`);
+      if (cfg.dip?.dip3?.enabled) lines.push(`🔥🔥 Dip L3: při -${cfg.dip.dip3.percent}% → ${cfg.dip.dip3.amount} USDT`);
+      if (cfg.dip?.dip4?.enabled) lines.push(`🔥🔥🔥 Dip L4: při -${cfg.dip.dip4.percent}% → ${cfg.dip.dip4.amount} USDT`);
+      document.getElementById('strategy-summary').innerHTML = lines.length ? lines.map(l => `<div style="margin-bottom:6px">${l}</div>`).join('') : '<span style="color:var(--muted)">Žádná strategie není aktivní</span>';
+
+      ['dca','dip1','dip2','dip3','dip4'].forEach(k => {
+        const val = k === 'dca' ? cfg.dca?.enabled : cfg.dip?.[k]?.enabled;
+        toggleState[k] = val ?? false;
+        const el = document.getElementById('t-' + k);
+        if (el) el.className = 'toggle' + (toggleState[k] ? ' on' : '');
+      });
+      if (cfg.dca) { document.getElementById('dcaAmount').value = cfg.dca.dcaAmount || 50; document.getElementById('dcaInterval').value = cfg.dca.dcaInterval || 'weekly'; }
+      if (cfg.dip?.dip1) { document.getElementById('dip1Percent').value = cfg.dip.dip1.percent || 7; document.getElementById('dip1Amount').value = cfg.dip.dip1.amount || 50; document.getElementById('dip1Max').value = cfg.dip.dip1.maxPerMonth || 3; }
+      if (cfg.dip?.dip2) { document.getElementById('dip2Percent').value = cfg.dip.dip2.percent || 15; document.getElementById('dip2Amount').value = cfg.dip.dip2.amount || 100; }
+      if (cfg.dip?.dip3) { document.getElementById('dip3Percent').value = cfg.dip.dip3.percent || 30; document.getElementById('dip3Amount').value = cfg.dip.dip3.amount || 200; }
+      if (cfg.dip?.dip4) { document.getElementById('dip4Percent').value = cfg.dip.dip4.percent || 40; document.getElementById('dip4Amount').value = cfg.dip.dip4.amount || 300; }
+      if (cfg.telegram) { document.getElementById('tgToken').value = cfg.telegram.token || ''; document.getElementById('tgChatId').value = cfg.telegram.chatId || ''; }
+    }
+  } catch(e) {}
+}
+
+async function loadAllTrades() {
+  try {
+    const trades = await fetch('/api/trades').then(r => r.json());
+    const tbody = document.getElementById('allTrades');
+    if (!trades.length) { tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:2rem">Zatím žádné nákupy</td></tr>'; return; }
+    tbody.innerHTML = trades.map(t => `<tr><td>${formatDate(t.date)}</td><td>${tradeTypeBadge(t.type)}</td><td>${t.usdt}</td><td>${t.btc.toFixed(8)}</td><td>$${t.price.toLocaleString('en-US',{maximumFractionDigits:0})}</td></tr>`).join('');
+  } catch(e) {}
+}
+
+loadDashboard();
+setInterval(loadDashboard, 60000);
+</script>
+</body>
+</html>
